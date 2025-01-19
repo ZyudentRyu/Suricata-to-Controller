@@ -4,10 +4,10 @@ import time
 import threading
 
 # Configuration
-suricata_log_file = "/var/log/suricata/eve.json"  # Path to the Suricata log file
-onos_api_url = "http://192.168.86.3:8181/onos/v1/flows"  # ONOS API URL
-onos_auth = ("onos", "rocks")  # ONOS authentication credentials
-mitigation_port = "6"  # Mitigation port for ICMP Flood
+suricata_log_file = "/path/to/suricata/eve.json"  # Path to the Suricata log file
+onos_api_url = "http://<controller-ip>:<controller-port>/onos/v1/flows"  # ONOS API URL
+onos_auth = ("username", "password")  # ONOS authentication credentials
+mitigation_port = "<mitigation_port>"  # Mitigation port for ICMP Flood
 mitigated_ips = set()  # Set to store mitigated IPs
 
 def monitor_suricata_log():
@@ -20,7 +20,7 @@ def monitor_suricata_log():
         while True:
             line = log_file.readline()
             if not line:
-                time.sleep(0.1)  # Wait briefly if there are no new logs for faster responsiveness
+                time.sleep(0.1)  # Wait briefly if there are no new logs
                 continue
             line = line.strip()
             if not line:
@@ -33,13 +33,12 @@ def monitor_suricata_log():
                     src_ip = log_data.get("src_ip", "")
 
                     # Detect relevant signatures for ICMP Flood
-                    if "Potential ICMP Flood Attack" in signature or "ICMP Flood Detected" in signature:
+                    if "<ICMP_Flood_Signature>" in signature:
                         # Only process IPs that have not been mitigated
                         if src_ip not in mitigated_ips:
-                            print("Detected ICMP Flood from {}".format(src_ip))
+                            print(f"Detected ICMP Flood from {src_ip}")
                             handle_icmp_flood(src_ip)
                         else:
-                            # Skip already mitigated IPs
                             continue
             except json.JSONDecodeError:
                 print("Warning: Invalid JSON log entry, ignored.")
@@ -50,7 +49,7 @@ def handle_icmp_flood(src_ip):
     Handles detected ICMP Flood attacks by creating a flow on the ONOS controller
     to redirect traffic from the attacker's IP to the mitigation port.
     """
-    print("Handling ICMP Flood from {}".format(src_ip))
+    print(f"Handling ICMP Flood from {src_ip}")
     add_flow_to_onos(src_ip, mitigation_port)
     # Mark the IP as mitigated
     mitigated_ips.add(src_ip)
@@ -61,10 +60,10 @@ def add_flow_to_onos(src_ip, mitigation_port):
     The flow filters ICMP traffic from the attacker's IP and applies the redirection.
     """
     flow = {
-        "priority": 40000,
-        "timeout": 0,
-        "isPermanent": True,
-        "deviceId": "of:0000ce88b0279447",  # Replace with your switch Device ID
+        "priority": <priority>,  # Example: 40000
+        "timeout": <timeout>,  # Example: 0 (no timeout)
+        "isPermanent": <true_or_false>,  # Example: True
+        "deviceId": "<switch_device_id>",  # Replace with your switch's Device ID
         "treatment": {
             "instructions": [
                 {"type": "OUTPUT", "port": mitigation_port}
@@ -72,9 +71,9 @@ def add_flow_to_onos(src_ip, mitigation_port):
         },
         "selector": {
             "criteria": [
-                {"type": "ETH_TYPE", "ethType": "0x0800"},  # IPv4
-                {"type": "IP_PROTO", "protocol": 1},  # ICMP
-                {"type": "IPV4_SRC", "ip": src_ip + "/32"}  # Filter by source IP
+                {"type": "ETH_TYPE", "ethType": "<ethType>"},  # Example: 0x0800 (IPv4)
+                {"type": "IP_PROTO", "protocol": <protocol>},  # Example: 1 (ICMP)
+                {"type": "IPV4_SRC", "ip": f"{src_ip}/32"}  # Filter by source IP
             ]
         }
     }
@@ -88,9 +87,9 @@ def add_flow_to_onos(src_ip, mitigation_port):
     print("Response Text:", response.text)
 
     if response.status_code in (200, 201):
-        print("Flow successfully added for IP {}, redirecting to port {}".format(src_ip, mitigation_port))
+        print(f"Flow successfully added for IP {src_ip}, redirecting to port {mitigation_port}")
     else:
-        print("Failed to add flow: {} - {}".format(response.status_code, response.text))
+        print(f"Failed to add flow: {response.status_code} - {response.text}")
 
 # Start monitoring the Suricata log in a separate thread for faster response
 def start_monitoring():
